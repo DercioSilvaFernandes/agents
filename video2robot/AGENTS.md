@@ -6,6 +6,20 @@ This workspace is used to make remote instances self-sufficient for integration,
 When a task-specific markdown file exists under `current_task/`, follow it as the mission-specific source of truth.
 When a remediation log is required, keep it updated throughout execution, not only at the end.
 
+## Remote Instance Access
+
+This task requires connecting to a remote EC2 instance before executing any environment setup.
+
+Instance:
+- Host: 34.252.135.22
+- User: ec2-user
+- SSH key: ./dm-isaac-g1.pem
+
+Use the following SSH command:
+
+```bash
+ssh -i ./dm-isaac-g1.pem ec2-user@34.252.135.22
+
 ## Core Operating Principles
 - Act like an operator, not a note-taker.
 - Do not stop at identifying blockers when a fix is possible.
