@@ -10,15 +10,25 @@ When a remediation log is required, keep it updated throughout execution, not on
 
 This task requires connecting to a remote EC2 instance before executing any environment setup.
 
-Instance:
-- Host: 34.252.135.22
-- User: ec2-user
-- SSH key: ./dm-isaac-g1.pem
+Do not assume a previously used public IP is still current.
+Discover the active ECS GPU instance first, then connect to the reachable host.
+
+Discovery:
+- `AWS_PROFILE=Trainee-260464233120 ./cloud/ecs/run.sh status`
+- `AWS_PROFILE=Trainee-260464233120 aws --region eu-west-1 ec2 describe-instances --filters 'Name=tag:Name,Values=dm-isaac-g1-gpu*' --query 'Reservations[].Instances[].{InstanceId:InstanceId,State:State.Name,PublicIp:PublicIpAddress,LaunchTime:LaunchTime}' --output table`
+
+Connection:
+- User: `ec2-user`
+- Preferred SSH key: `/Users/dercio.fernandes/dm-isaac-g1.pem`
+- Repo-relative fallback: `./dm-isaac-g1.pem` if present
+
+Never store or rely on passwords in tracked task instructions.
 
 Use the following SSH command:
 
 ```bash
-ssh -i ./dm-isaac-g1.pem ec2-user@34.252.135.22
+ssh -i /Users/dercio.fernandes/dm-isaac-g1.pem ec2-user@<active-public-ip>
+```
 
 ## Core Operating Principles
 - Act like an operator, not a note-taker.

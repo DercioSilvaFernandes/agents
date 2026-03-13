@@ -14,11 +14,20 @@ Fix blockers when possible and document the full fixing process so the environme
 Upstream repository:
 - `https://github.com/AIM-Intelligence/video2robot`
 
+dm-isaac-g1 context:
+- In the workstation/ECS images, `video2robot` is baked into `/workspace/video2robot`.
+- Conda envs `phmr` (PromptHMR) and `gmr` (GMR) are created on the workstation/ECS images.
+- The web UI is exposed on port `8000` via a small auth wrapper script (`video2robot-server.py`) that wraps the upstream FastAPI app.
+
 Primary target capabilities to make work:
-1. non-GUI pipeline using:
-   - `python scripts/run_pipeline.py --video <local_video_path>`
-2. GUI/web pipeline using:
-   - `uvicorn web.app:app --host 0.0.0.0 --port 8000`
+1. non-GUI pipeline (PromptHMR + GMR) using the two-stage CLI that dm-isaac-g1 documents:
+   - `conda activate phmr && python scripts/extract_pose.py --video <local_video_path> --output <poses_dir>`
+   - `conda activate gmr && python scripts/retarget.py --input <poses_dir> --robot unitree_g1 --output <retarget_dir>`
+   - optionally, if present, the upstream wrapper:
+     - `python scripts/run_pipeline.py --video <local_video_path>`
+2. GUI/web pipeline using the FastAPI app:
+   - direct: `uvicorn web.app:app --host 0.0.0.0 --port 8000`
+   - in dm-isaac-g1 containers: via `video2robot-server.py` on `http://<host>:8000` with HTTP Basic Auth (password from `SERVICE_PASSWORD`)
 
 ## Upstream Expectations to Respect
 According to the upstream README:
@@ -38,13 +47,17 @@ Success means all of the following are true:
 
 ### Non-GUI success
 - the repo is cloned correctly with submodules
-- all required environments and dependencies are installed
+- all required environments and dependencies are installed (including `phmr` and `gmr` where applicable)
 - a local test video containing a visible person exists in the workspace
-- `python scripts/run_pipeline.py --video <local_video_path>` runs successfully far enough to prove the real pipeline is operational end-to-end for this environment
-- produced outputs and project artifacts are created as expected
+- the non-GUI pipeline runs end-to-end using either:
+  - the two-stage CLI: `extract_pose.py` (phmr) then `retarget.py` (gmr), as documented in `cloud/ecs/GUIDE.md`, or
+  - the upstream wrapper: `python scripts/run_pipeline.py --video <local_video_path>`
+- produced outputs and project artifacts are created as expected (pose PKL + retargeted motion)
 
 ### GUI success
-- the web server starts successfully with `uvicorn`
+- the web server starts successfully:
+  - either via `uvicorn web.app:app` or
+  - via the `video2robot-server.py` auth wrapper on port `8000`
 - the UI is reachable from the intended access path for this instance
 - the GUI path can accept or use a local video and run the pipeline path successfully
 - any GUI-specific dependency, serving, path, or runtime issue is fixed
@@ -55,6 +68,8 @@ The task is not complete if only one of the two modes works.
 Continuously maintain this remediation log during the task:
 
 - `current_task/VIDEO2ROBOT_REMEDIATION_LOG.md`
+
+Use `agents/video2robot/VIDEO2ROBOT_REMEDIATION_LOG.md` as the template when creating the `current_task/` copy.
 
 That file is the handoff artifact and must remain up to date throughout the debugging session, not only at the end.
 
@@ -124,8 +139,12 @@ That file is the handoff artifact and must remain up to date throughout the debu
 
 ### Phase 4 — Non-GUI Validation
 13. Run baseline checks for the non-GUI path.
-14. Run:
-   - `python scripts/run_pipeline.py --video <local_video_path>`
+14. Run the non-GUI pipeline:
+   - Preferred (matches dm-isaac-g1 docs):
+     - `conda activate phmr && python scripts/extract_pose.py --video <local_video_path> --output <poses_dir>`
+     - `conda activate gmr && python scripts/retarget.py --input <poses_dir> --robot unitree_g1 --output <retarget_dir>`
+   - Or, if supported by the checked-out revision:
+     - `python scripts/run_pipeline.py --video <local_video_path>`
 15. If it fails:
    - identify the failing stage exactly
    - apply the smallest plausible fix
@@ -133,8 +152,9 @@ That file is the handoff artifact and must remain up to date throughout the debu
 16. Continue until the non-GUI path works end-to-end.
 
 ### Phase 5 — GUI Validation
-17. Start the web server with:
-   - `uvicorn web.app:app --host 0.0.0.0 --port 8000`
+17. Start the web server with either:
+   - `uvicorn web.app:app --host 0.0.0.0 --port 8000`, or
+   - the dm-isaac-g1 wrapper: `video2robot-server.py` (exposed as `http://<host>:8000` with HTTP Basic Auth)
 18. Verify:
    - bind success
    - route availability
@@ -167,8 +187,8 @@ Minimum validation layers:
 
 ### Non-GUI validation
 - real local video input exists
-- `run_pipeline.py --video ...` executes successfully
-- expected output/project artifacts are generated
+- either the two-stage CLI (`extract_pose.py` + `retarget.py`) or `run_pipeline.py --video ...` executes successfully
+- expected output/project artifacts are generated (pose PKL + retargeted motion)
 
 ### GUI validation
 - `uvicorn` server starts successfully
